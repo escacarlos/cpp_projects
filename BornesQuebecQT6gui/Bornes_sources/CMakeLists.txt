@@ -11,10 +11,18 @@ add_library(BornesLibrary #SHARED #if dynamic library
 # Include directories
 target_include_directories(BornesLibrary PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-# If you want to link against GTest for testing (gtest must be in the project)
-#add_subdirectory(googletest)
-#include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR})
+if(BUILD_TESTING)
+    include(FetchContent)
 
-enable_testing()
+    set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG v1.14.0
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(googletest)
 
-add_subdirectory(tests)
+    add_subdirectory(tests)
+endif()

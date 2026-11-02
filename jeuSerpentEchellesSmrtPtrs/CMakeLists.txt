@@ -49,27 +49,42 @@
 #CMakeLists.txt for CLion IDE
 cmake_minimum_required(VERSION 3.20)
 
-project(TP1)
+project(TP1_smrt_ptr LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wpedantic -Wextra -Wconversion -Wshadow")
+add_library(tp1_core_smrt_ptr
+        Case.cpp
+        GenerateurAleatoireJeuSerpentsEtEchelles.cpp
+        GenerateurNombresAleatoires.cpp
+        JeuSerpentsEtEchelles.cpp
+        ListeDeCases.cpp
+        MemUsage.cpp)
 
-# include(FetchContent)
+target_include_directories(tp1_core_smrt_ptr PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-# FetchContent_Declare(
-#         googletest
-#         GIT_REPOSITORY https://github.com/google/googletest.git
-#         GIT_TAG  v1.12.0
-# )
-# FetchContent_MakeAvailable(googletest)
+add_executable(${PROJECT_NAME} Principal.cpp)
+target_link_libraries(${PROJECT_NAME} PRIVATE tp1_core_smrt_ptr )
 
-file(GLOB SRC_FILES ./*.cpp)
+include(CTest)
 
-add_executable(${PROJECT_NAME} ${SRC_FILES})
+if(BUILD_TESTING)
+    include(FetchContent)
 
-# enable_testing()
+    FetchContent_Declare(
+            googletest
+            GIT_REPOSITORY https://github.com/google/googletest.git
+            GIT_TAG v1.12.0
+    )
+    FetchContent_MakeAvailable(googletest)
 
-# target_link_libraries(${PROJECT_NAME} gtest_main gtest pthread)
+    add_executable(TP1_smrt_ptr_tests
+            tests/tests_Case.cpp
+            tests/tests_File.cpp
+            tests/tests_ListeDeCases.cpp)
+    target_link_libraries(TP1_smrt_ptr_tests PRIVATE tp1_core_smrt_ptr  GTest::gtest_main)
 
-# include(GoogleTest)
+    include(GoogleTest)
+    gtest_discover_tests(TP1_smrt_ptr_tests)
+endif()

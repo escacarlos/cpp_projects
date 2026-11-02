@@ -1,0 +1,19 @@
+# Bornes Quebec TP3
+
+[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-24ddc0f5d75046c5622901739e7c5dd533143b0c8e959d652212380cedb1ea36.svg)](https://classroom.github.com/a/5IaJ2mZj)
+
+git status --short && git rev-parse --show-toplevel
+
+git status --short -- BornesQuebecQT6gui && git diff -- BornesQuebecQT6gui/Bornes_sources/CMakeLists.txt
+
+git status --short -- BornesQuebecQT6gui/ && git diff -- BornesQuebecQT6gui/Bornes_sources/CMakeLists.txt && git diff -- BornesQuebecQT6gui/CMakeLists.txt BornesQuebecQT6gui/Bornes_gui/CMakeLists.txt BornesQuebecQT6gui/Bornes_sources/tests/CMakeLists.txt
+
+git status --short --untracked-files=no && git diff -- Bornes_sources/CMakeLists.txt
+
+git diff -- Bornes_sources/CMakeLists.txt
+
+cmake --version | head -n 1; dpkg-query -W -f='${binary:Package} ${Version}\n' qt6-base-dev libgtest-dev cmake g++ ninja-build 2>/dev/null || true
+
+cmake -S . -B /tmp/bornes-quebec-linux-build -DBUILD_TESTING=OFF && cmake --build /tmp/bornes-quebec-linux-build -j2
+
+git diff -- CMakeLists.txt Bornes_gui/CMakeLists.txt Bornes_sources/CMakeLists.txt Bornes_sources/tests/CMakeLists.txt README.md

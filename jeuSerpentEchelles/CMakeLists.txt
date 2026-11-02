@@ -49,25 +49,41 @@
 #CMakeLists.txt for CLion IDE
 cmake_minimum_required(VERSION 3.20)
 
-project(TP1)
+project(TP1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# include(FetchContent)
+add_library(tp1_core
+        Case.cpp
+        GenerateurAleatoireJeuSerpentsEtEchelles.cpp
+        GenerateurNombresAleatoires.cpp
+        JeuSerpentsEtEchelles.cpp
+        ListeDeCases.cpp)
 
-# FetchContent_Declare(
-#         googletest
-#         GIT_REPOSITORY https://github.com/google/googletest.git
-#         GIT_TAG  v1.12.0
-# )
-# FetchContent_MakeAvailable(googletest)
+target_include_directories(tp1_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-file(GLOB SRC_FILES ./*.cpp)
+add_executable(${PROJECT_NAME} Principal.cpp)
+target_link_libraries(${PROJECT_NAME} PRIVATE tp1_core)
 
-add_executable(${PROJECT_NAME} ${SRC_FILES})
+include(CTest)
 
-# enable_testing()
+if(BUILD_TESTING)
+    include(FetchContent)
 
-# target_link_libraries(${PROJECT_NAME} gtest_main gtest pthread)
+    FetchContent_Declare(
+            googletest
+            GIT_REPOSITORY https://github.com/google/googletest.git
+            GIT_TAG v1.12.0
+    )
+    FetchContent_MakeAvailable(googletest)
 
-# include(GoogleTest)
+    add_executable(TP1_tests
+            tests/tests_Case.cpp
+            tests/tests_File.cpp
+            tests/tests_ListeDeCases.cpp)
+    target_link_libraries(TP1_tests PRIVATE tp1_core GTest::gtest_main)
+
+    include(GoogleTest)
+    gtest_discover_tests(TP1_tests)
+endif()

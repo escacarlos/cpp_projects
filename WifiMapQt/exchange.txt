@@ -1,0 +1,51 @@
+Yes. I read the project: WifiMap is a Java Swing desktop app with a Wi-Fi heatmap, access points and barriers, mouse-based editing, zoom/pan, grid snapping, undo/redo, save/load, and PNG export. Its only Maven dependency is NetBeans `AbsoluteLayout`, which is tied to the current Swing UI and would not be needed in the Qt version.
+
+**Qt dependencies to install**
+
+For a Linux desktop build, the essentials are a C++ compiler, CMake, and Qt 6’s Core, Gui, and Widgets modules:
+
+```bash
+sudo apt update
+sudo apt install build-essential cmake ninja-build qt6-base-dev qt6-base-dev-tools
+```
+
+That provides the usual C++ build tools and the Qt modules needed for the app. Add these only if you want their tools or test support:
+
+```bash
+sudo apt install qtcreator qt6-tools-dev qt6-tools-dev-tools
+```
+
+Qt Creator is an optional IDE; the Qt Designer tool is optional too. For unit tests, use Qt Test, typically supplied by `qt6-base-dev`. **No Qt Network, SQL, Multimedia, or PrintSupport modules appear necessary.** The app can use Qt Core’s JSON support for its own map-file format and Qt Gui’s `QPainter`/`QImage` for drawing and PNG export.
+
+Alternatively, use Qt’s online installer and choose the **open-source** option, a Desktop C++ kit for your system, and CMake/Ninja. Qt is available under open-source licenses; check the LGPL/GPL terms if you distribute the app. Use the same Qt 6 version across development machines.
+
+**Migration plan**
+
+1. **Port the domain model and signal calculations** into C++ classes: map, parcels, access points, barriers, materials, validation, and heatmap colors. Keep this independent of the UI.
+2. **Build the interface** with Qt Widgets: a `QMainWindow`, control panels, menus, dialogs, and a custom `QWidget` canvas painted with `QPainter`.
+3. **Recreate map interactions**: coordinate conversion and Y-axis inversion, selection, drawing and dragging, zoom around the cursor, panning, grid display, snapping, and tooltips.
+4. **Wire editing actions** to the model, including add/modify/delete, resizing, and undo/redo using `QUndoStack` and `QUndoCommand`.
+5. **Replace file handling and export**: save/load a documented JSON map format; export the complete map rendering to PNG with `QImage`.
+6. **Test and package**: add model tests with Qt Test, check that key map interactions and saved maps work, then build with CMake.
+
+One compatibility decision matters early: the existing save files use Java object serialization, which C++/Qt cannot read directly. The simplest path is to use JSON for the new version; if you need old maps to carry over, add a Java-side export to JSON first.
+
+Yes—I can translate WifiMap and create a separate `WifiMapQt/` project with the CMake setup, C++ source files, Qt interface, JSON save/load, and tests, while leaving the Java project intact.
+
+You **don’t need a separate JSON library**: Qt Core includes `QJsonDocument`, `QJsonObject`, and `QJsonArray` for reading and writing map files.
+
+I’ll add the Qt/C++ app alongside the Java source, port the domain behavior first, then connect the canvas and JSON persistence. I’m checking the model constraints and installed Qt kit before creating the project.
+
+The Qt project skeleton and core model are in place, including the first JSON schema and signal calculation. I’m now connecting the interactive window, keeping edits undoable and making saves validate/load atomically.
+
+The app now builds and the model tests pass; the initial test failure exposed an incorrect expectation because moving an access point still leaves measurable signal at its previous cell. I’ve corrected that test and am tightening the UI details and clean-build behavior.
+
+Created a standalone **`WifiMapQt/`** C++17/Qt 6 project alongside the Java app. It includes the Wi-Fi heatmap model, access-point and barrier editing, zoom/pan, grid snapping, undo/redo, resizing, PNG export, and versioned JSON save/load using Qt Core—no extra JSON library required. The README documents the JSON format and build steps.
+
+**Verified:** the app builds, all model tests pass, and it starts in an offscreen smoke test. To run it from the project root:
+
+```bash
+cmake -S WifiMapQt -B WifiMapQt/build -G Ninja
+cmake --build WifiMapQt/build
+./WifiMapQt/build/WifiMapQt
+```

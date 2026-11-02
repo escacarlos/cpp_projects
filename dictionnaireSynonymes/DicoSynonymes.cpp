@@ -206,8 +206,8 @@ void DicoSynonymes::supprimerRadical(const std::string &motRadical) {
   for (auto &groupe: noeudRadical->appSynonymes) {
     groupesSynonymes.at(groupe).remove(noeudRadical);
   }
-  for (auto &flexion: noeudRadical->flexions) {
-    supprimerFlexion(motRadical, flexion);
+  while (!noeudRadical->flexions.empty()) {
+    supprimerFlexion(motRadical, noeudRadical->flexions.front());
   }
   _auxEnleverAVL(racine, motRadical);
 }

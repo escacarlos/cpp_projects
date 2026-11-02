@@ -1,9 +1,6 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.16)
 
 project(BornesQC_GUI)
-
-# Find Qt installation
-set(CMAKE_PREFIX_PATH "G:/Qt/6.8.2/mingw_64")
 
 # Find Qt6
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
@@ -30,9 +27,5 @@ BorneStationnementAjouter.ui
 SupprimerBorne.ui
 )
 
-# Include Qt headers
-target_include_directories(bqc_gui PRIVATE ${Qt6Widgets_INCLUDE_DIRS})
-
 # Link against Qt6
 target_link_libraries(bqc_gui PRIVATE Qt6::Widgets BornesLibrary)
-

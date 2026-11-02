@@ -28,3 +28,5 @@
 /Bornes_gui/build/
 /Bornes_gui/dist/
 /html/
+/cmake-build-debug/
+/.idea/
