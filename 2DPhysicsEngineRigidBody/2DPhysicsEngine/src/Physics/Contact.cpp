@@ -1,4 +1,4 @@
-#include "contact.h"
+#include "Contact.h"
 
 void Contact::ResolvePenetration() {
 	if (a->IsStatic() && b->IsStatic()) {

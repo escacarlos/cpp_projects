@@ -2,7 +2,7 @@
 #define BODY_H
 
 #include "Vec2.h"
-#include "shape.h"
+#include "Shape.h"
 
 struct Body {
     bool isColliding = false;

@@ -8,7 +8,7 @@ SRC_FILES = ./lib/SDL2_gfx/*.c \
 			./src/*.cpp \
 			./src/Physics/*.cpp \
 
-LINKER_FLAGS = -lmingw32 -lSDL2main -lSDL2 -lSDL2_image
+LINKER_FLAGS = -lSDL2main -lSDL2 -lSDL2_image #-lmingw32
 OBJ_NAME = physicengine
 
 ################################################################################

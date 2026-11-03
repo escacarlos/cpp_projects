@@ -2,7 +2,7 @@
 #define COLLISIONDETECTION_H
 
 #include "Body.h"
-#include "contact.h"
+#include "Contact.h"
 
 struct CollisionDetection {
 	static bool IsColliding(Body* a, Body* b, Contact& contact);

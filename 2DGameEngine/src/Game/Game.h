@@ -6,7 +6,7 @@
 #include "../EventBus/EventBus.h"
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
-#include <sol/sol.hpp>
+#include <string>
 
 const int FPS = 60;
 const int MILLISECS_PER_FRAME = 1000 / FPS;
@@ -15,12 +15,12 @@ class Game {
     private:
         bool isRunning;
         bool isDebug;
+        bool sdlInitialized = false;
+        bool ttfInitialized = false;
         int millisecsPreviousFrame = 0;
-        SDL_Window* window;
-        SDL_Renderer* renderer;
-        SDL_Rect camera;
-
-        sol::state lua;
+        SDL_Window* window = nullptr;
+        SDL_Renderer* renderer = nullptr;
+        SDL_Rect camera{};
         
         std::unique_ptr<Registry> registry;
         std::unique_ptr<AssetStore> assetStore;
@@ -29,9 +29,9 @@ class Game {
     public:
         Game();
         ~Game();
-        void Initialize();
-        void Run();
-        void Setup();
+        bool Initialize();
+        void Run(const std::string& levelPath);
+        void Setup(const std::string& levelPath);
         void ProcessInput();
         void Update();
         void Render();

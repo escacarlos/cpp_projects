@@ -1,4 +1,4 @@
-#include "collisionDetection.h"
+#include "CollisionDetection.h"
 
 bool CollisionDetection::IsColliding(Body* a, Body* b, Contact& contact) {
 	bool aIsCircle = a->shape->GetType() == CIRCLE;

@@ -7,6 +7,7 @@
 #include "../AssetStore/AssetStore.h"
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
+#include <algorithm>
 
 class RenderSystem: public System {
     public:

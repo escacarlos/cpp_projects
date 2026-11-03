@@ -5,14 +5,19 @@
 #include "../AssetStore/AssetStore.h"
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
-#include <sol/sol.hpp>
 #include <memory>
+#include <string>
 
 class LevelLoader {
     public:
         LevelLoader();
         ~LevelLoader();
-        void LoadLevel(sol::state& lua, const std::unique_ptr<Registry>& registry, const std::unique_ptr<AssetStore>& assetStore, SDL_Renderer* renderer, int level);
+        void LoadLevel(
+            const std::unique_ptr<Registry>& registry,
+            const std::unique_ptr<AssetStore>& assetStore,
+            SDL_Renderer* renderer,
+            const std::string& levelPath
+        );
 };
 
 #endif

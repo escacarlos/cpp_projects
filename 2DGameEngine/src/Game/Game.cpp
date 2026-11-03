@@ -14,16 +14,11 @@
 #include "../Systems/ProjectileLifecycleSystem.h"
 #include "../Systems/RenderTextSystem.h"
 #include "../Systems/RenderHealthBarSystem.h"
-#include "../Systems/RenderGUISystem.h"
-#include "../Systems/ScriptSystem.h"
 #define SDL_MAIN_HANDLED
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <glm/glm.hpp>
-#include <imgui/imgui.h>
-#include <imgui/imgui_sdl.h>
-#include <imgui/imgui_impl_sdl.h>
 
 int Game::windowWidth;
 int Game::windowHeight;
@@ -43,17 +38,22 @@ Game::~Game() {
     Logger::Log("Game destructor called!");   
 }
 
-void Game::Initialize() {
+bool Game::Initialize() {
     if (SDL_Init(SDL_INIT_EVERYTHING) != 0) {
-        Logger::Err("Error initializing SDL.");
-        return;
+        Logger::Err(std::string("Error initializing SDL: ") + SDL_GetError());
+        return false;
     }
+    sdlInitialized = true;
     if (TTF_Init() != 0) {
-        Logger::Err("Error initializing SDL TTF.");
-        return;
+        Logger::Err(std::string("Error initializing SDL TTF: ") + TTF_GetError());
+        return false;
     }
+    ttfInitialized = true;
     SDL_DisplayMode displayMode;
-    SDL_GetCurrentDisplayMode(0, &displayMode);
+    if (SDL_GetCurrentDisplayMode(0, &displayMode) != 0) {
+        Logger::Err(std::string("Error getting display mode: ") + SDL_GetError());
+        return false;
+    }
     windowWidth = displayMode.w;
     windowHeight = displayMode.h;
     window = SDL_CreateWindow(
@@ -65,18 +65,14 @@ void Game::Initialize() {
         SDL_WINDOW_BORDERLESS
     );
     if (!window) {
-        Logger::Err("Error creating SDL window.");
-        return;
+        Logger::Err(std::string("Error creating SDL window: ") + SDL_GetError());
+        return false;
     }
     renderer = SDL_CreateRenderer(window, -1, 0);
     if (!renderer) {
-        Logger::Err("Error creating SDL renderer.");
-        return;
+        Logger::Err(std::string("Error creating SDL renderer: ") + SDL_GetError());
+        return false;
     }
-
-    // Initialize the ImGui context
-    ImGui::CreateContext();
-    ImGuiSDL::Initialize(renderer, windowWidth, windowHeight);
 
     // Initialize the camera view with the entire screen area
     camera = {0, 0, windowWidth, windowHeight};
@@ -84,20 +80,12 @@ void Game::Initialize() {
     SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN);
     
     isRunning = true;
+    return true;
 }
 
 void Game::ProcessInput() {
     SDL_Event sdlEvent;
     while (SDL_PollEvent(&sdlEvent)) {
-        // ImGui SDL input
-        ImGui_ImplSDL2_ProcessEvent(&sdlEvent);
-        ImGuiIO& io = ImGui::GetIO();
-        int mouseX, mouseY;
-        const int buttons = SDL_GetMouseState(&mouseX, &mouseY);
-        io.MousePos = ImVec2(mouseX, mouseY);
-        io.MouseDown[0] = buttons & SDL_BUTTON(SDL_BUTTON_LEFT);
-        io.MouseDown[1] = buttons & SDL_BUTTON(SDL_BUTTON_RIGHT);
-
         // Handle core SDL events (close window, key pressed, etc.)
         switch (sdlEvent.type) {
             case SDL_QUIT:
@@ -116,7 +104,7 @@ void Game::ProcessInput() {
     }
 }
 
-void Game::Setup() {
+void Game::Setup(const std::string& levelPath) {
     // Add the sytems that need to be processed in our game
     registry->AddSystem<MovementSystem>();
     registry->AddSystem<RenderSystem>();
@@ -130,16 +118,9 @@ void Game::Setup() {
     registry->AddSystem<ProjectileLifecycleSystem>();
     registry->AddSystem<RenderTextSystem>();
     registry->AddSystem<RenderHealthBarSystem>();
-    registry->AddSystem<RenderGUISystem>();
-    registry->AddSystem<ScriptSystem>();
 
-    // Create the bindings between C++ and Lua
-    registry->GetSystem<ScriptSystem>().CreateLuaBindings(lua);
-
-    // Load the first level
     LevelLoader loader;
-    lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::os);
-    loader.LoadLevel(lua, registry, assetStore, renderer, 2);
+    loader.LoadLevel(registry, assetStore, renderer, levelPath);
 }
 
 void Game::Update() {
@@ -168,7 +149,6 @@ void Game::Update() {
     registry->GetSystem<ProjectileEmitSystem>().Update(registry);
     registry->GetSystem<CameraMovementSystem>().Update(camera);
     registry->GetSystem<ProjectileLifecycleSystem>().Update();
-    registry->GetSystem<ScriptSystem>().Update(deltaTime, SDL_GetTicks());
 }
 
 void Game::Render() {
@@ -181,14 +161,13 @@ void Game::Render() {
     registry->GetSystem<RenderHealthBarSystem>().Update(renderer, assetStore, camera);
     if (isDebug) {
         registry->GetSystem<RenderColliderSystem>().Update(renderer, camera);
-        registry->GetSystem<RenderGUISystem>().Update(registry, camera);
     }
 
     SDL_RenderPresent(renderer);
 }
 
-void Game::Run() {
-    Setup();
+void Game::Run(const std::string& levelPath) {
+    Setup(levelPath);
     while (isRunning) {
         ProcessInput();
         Update();
@@ -197,9 +176,22 @@ void Game::Run() {
 }
 
 void Game::Destroy() {
-    ImGuiSDL::Deinitialize();
-    ImGui::DestroyContext();
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
+    assetStore->ClearAssets();
+    if (renderer) {
+        SDL_DestroyRenderer(renderer);
+        renderer = nullptr;
+    }
+    if (window) {
+        SDL_DestroyWindow(window);
+        window = nullptr;
+    }
+    if (ttfInitialized) {
+        TTF_Quit();
+        ttfInitialized = false;
+    }
+    if (sdlInitialized) {
+        SDL_Quit();
+        sdlInitialized = false;
+    }
+    isRunning = false;
 }

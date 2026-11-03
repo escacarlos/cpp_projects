@@ -2,7 +2,7 @@
 #include "./Physics/Constants.h"
 #include "./Physics/Force.h"
 #include "./Physics/CollisionDetection.h"
-#include "./Physics/contact.h"
+#include "./Physics/Contact.h"
 
 bool Application::IsRunning() {
     return running;

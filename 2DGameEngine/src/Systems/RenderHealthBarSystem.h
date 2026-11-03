@@ -66,25 +66,29 @@ class RenderHealthBarSystem: public System {
                 SDL_SetRenderDrawColor(renderer, healthBarColor.r, healthBarColor.g, healthBarColor.b, 255);
                 SDL_RenderFillRect(renderer, &healthBarRectangle);
 
-                // Render the health percentage text label indicator
                 std::string healthText = std::to_string(health.healthPercentage);
-                SDL_Surface* surface = TTF_RenderText_Blended(assetStore->GetFont("pico8-font-5"), healthText.c_str(), healthBarColor);
-                SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-                SDL_FreeSurface(surface);
-
-                int labelWidth = 0;
-                int labelHeight = 0;
-                SDL_QueryTexture(texture, NULL, NULL, &labelWidth, &labelHeight);
-                SDL_Rect healthBarTextRectangle = {
-                    static_cast<int>(healthBarPosX),
-                    static_cast<int>(healthBarPosY) + 5,
-                    labelWidth,
-                    labelHeight
-                };
-                
-                SDL_RenderCopy(renderer, texture, NULL, &healthBarTextRectangle);
-
-                SDL_DestroyTexture(texture);
+                SDL_Surface* surface = TTF_RenderText_Blended(
+                    assetStore->GetFont("pico8-font-5"),
+                    healthText.c_str(),
+                    healthBarColor
+                );
+                if (surface) {
+                    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+                    SDL_FreeSurface(surface);
+                    if (texture) {
+                        int labelWidth = 0;
+                        int labelHeight = 0;
+                        SDL_QueryTexture(texture, NULL, NULL, &labelWidth, &labelHeight);
+                        SDL_Rect healthBarTextRectangle = {
+                            static_cast<int>(healthBarPosX),
+                            static_cast<int>(healthBarPosY) + 5,
+                            labelWidth,
+                            labelHeight
+                        };
+                        SDL_RenderCopy(renderer, texture, NULL, &healthBarTextRectangle);
+                        SDL_DestroyTexture(texture);
+                    }
+                }
             }
         }
 };
