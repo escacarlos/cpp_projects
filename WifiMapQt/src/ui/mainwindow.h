@@ -7,6 +7,7 @@
 #include <functional>
 
 class QComboBox;
+class QAction;
 class QLabel;
 class QSpinBox;
 class QPushButton;
@@ -40,8 +41,17 @@ private:
     QSpinBox *m_mapLength = nullptr;
     QSpinBox *m_mapWidth = nullptr;
     QLabel *m_selectionLabel = nullptr;
+    QAction *m_copyAction = nullptr;
+    QAction *m_pasteAction = nullptr;
     int m_selectedId = -1;
     bool m_selectedBarrier = false;
+    AccessPoint m_copiedAccessPoint;
+    Barrier m_copiedBarrier;
+    QJsonObject m_dragBefore;
+    QString m_dragLabel;
+    bool m_hasCopiedElement = false;
+    bool m_copiedBarrierElement = false;
+    bool m_dragActive = false;
     QString m_currentFile;
 
     void createUi();
@@ -50,6 +60,9 @@ private:
     void refreshCanvas();
     void reportError(const QString &message);
     void commitChange(const QString &label, const std::function<void()> &change);
+    void copySelectedElement();
+    void pasteElement();
+    void finishDrag();
     bool saveMap();
     bool saveMapAs();
     void openMap();

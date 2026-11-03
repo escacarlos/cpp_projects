@@ -5,6 +5,13 @@ the Wi-Fi heatmap, access points, material-dependent barriers, editing and
 dragging, zoom/pan, grid snapping, undo/redo, map resizing, JSON persistence,
 and PNG export.
 
+Dragging an access point or barrier recalculates the heatmap live. Use
+**Edit → Copy element** and **Edit → Paste element** (Ctrl+C/Ctrl+V while the
+map is focused) to duplicate a selected element; the paste is offset by five
+cells in each direction, reversing an axis when needed to fit the map.
+The map canvas displays zero-based X and Y coordinate axes, with tick spacing
+adjusted to the current zoom level.
+
 ## Requirements
 
 - C++17 compiler

@@ -11,6 +11,7 @@
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QJsonDocument>
+#include <QKeySequence>
 #include <QJsonParseError>
 #include <QLabel>
 #include <QMessageBox>
@@ -272,15 +273,27 @@ void MainWindow::createUi()
         });
     };
     m_canvas->accessPointMoved = [this](int id, int x, int y) {
-        commitChange(tr("Move access point"), [this, id, x, y] {
+        try {
             m_model.moveAccessPoint(id, x, y);
-        });
+            refreshCanvas();
+        } catch (const std::exception &error) {
+            statusBar()->showMessage(QString::fromUtf8(error.what()), 3000);
+        }
     };
     m_canvas->barrierMoved = [this](int id, int x1, int y1, int x2, int y2) {
-        commitChange(tr("Move barrier"), [this, id, x1, y1, x2, y2] {
+        try {
             m_model.moveBarrier(id, x1, y1, x2, y2);
-        });
+            refreshCanvas();
+        } catch (const std::exception &error) {
+            statusBar()->showMessage(QString::fromUtf8(error.what()), 3000);
+        }
     };
+    m_canvas->dragStarted = [this](int, bool barrier) {
+        m_dragBefore = m_model.toJson();
+        m_dragLabel = barrier ? tr("Move barrier") : tr("Move access point");
+        m_dragActive = true;
+    };
+    m_canvas->dragFinished = [this] { finishDrag(); };
 }
 
 void MainWindow::createMenus()
@@ -297,6 +310,17 @@ void MainWindow::createMenus()
     QMenu *edit = menuBar()->addMenu(tr("&Edit"));
     edit->addAction(m_undoStack->createUndoAction(this, tr("&Undo")));
     edit->addAction(m_undoStack->createRedoAction(this, tr("&Redo")));
+    edit->addSeparator();
+    m_copyAction = edit->addAction(tr("&Copy element"));
+    m_copyAction->setShortcut(QKeySequence::Copy);
+    m_copyAction->setShortcutContext(Qt::WidgetShortcut);
+    m_copyAction->setEnabled(false);
+    m_pasteAction = edit->addAction(tr("&Paste element"));
+    m_pasteAction->setShortcut(QKeySequence::Paste);
+    m_pasteAction->setShortcutContext(Qt::WidgetShortcut);
+    m_pasteAction->setEnabled(false);
+    m_canvas->addAction(m_copyAction);
+    m_canvas->addAction(m_pasteAction);
 
     connect(newAction, &QAction::triggered, this, &MainWindow::createNewMap);
     connect(openAction, &QAction::triggered, this, &MainWindow::openMap);
@@ -304,6 +328,8 @@ void MainWindow::createMenus()
     connect(saveAsAction, &QAction::triggered, this, [this] { saveMapAs(); });
     connect(exportAction, &QAction::triggered, this, &MainWindow::exportPng);
     connect(quitAction, &QAction::triggered, this, &QWidget::close);
+    connect(m_copyAction, &QAction::triggered, this, &MainWindow::copySelectedElement);
+    connect(m_pasteAction, &QAction::triggered, this, &MainWindow::pasteElement);
 }
 
 void MainWindow::selectElement(int id)
@@ -341,6 +367,8 @@ void MainWindow::selectElement(int id)
     m_deletePoint->setEnabled(m_selectedId >= 0 && !m_selectedBarrier);
     m_updateBarrier->setEnabled(m_selectedId >= 0 && m_selectedBarrier);
     m_deleteBarrier->setEnabled(m_selectedId >= 0 && m_selectedBarrier);
+    if (m_copyAction)
+        m_copyAction->setEnabled(m_selectedId >= 0);
     if (m_selectedId < 0)
         m_selectionLabel->setText(tr("Nothing selected"));
     m_canvas->setSelection(m_selectedId, m_selectedBarrier);
@@ -375,6 +403,112 @@ void MainWindow::commitChange(const QString &label, const std::function<void()> 
         refreshCanvas();
         reportError(QString::fromUtf8(error.what()));
     }
+}
+
+void MainWindow::copySelectedElement()
+{
+    if (m_selectedId < 0)
+        return;
+
+    if (m_selectedBarrier) {
+        const auto it = std::find_if(m_model.barriers().cbegin(), m_model.barriers().cend(),
+                                     [this](const Barrier &barrier) { return barrier.id == m_selectedId; });
+        if (it == m_model.barriers().cend())
+            return;
+        m_copiedBarrier = *it;
+        m_copiedBarrierElement = true;
+    } else {
+        const auto it = std::find_if(m_model.accessPoints().cbegin(), m_model.accessPoints().cend(),
+                                     [this](const AccessPoint &point) { return point.id == m_selectedId; });
+        if (it == m_model.accessPoints().cend())
+            return;
+        m_copiedAccessPoint = *it;
+        m_copiedBarrierElement = false;
+    }
+    m_hasCopiedElement = true;
+    m_pasteAction->setEnabled(true);
+    statusBar()->showMessage(tr("Copied element"), 3000);
+}
+
+void MainWindow::pasteElement()
+{
+    if (!m_hasCopiedElement)
+        return;
+
+    const int minX = m_copiedBarrierElement
+                         ? std::min(m_copiedBarrier.x1, m_copiedBarrier.x2) : m_copiedAccessPoint.x;
+    const int maxX = m_copiedBarrierElement
+                         ? std::max(m_copiedBarrier.x1, m_copiedBarrier.x2) : m_copiedAccessPoint.x;
+    const int minY = m_copiedBarrierElement
+                         ? std::min(m_copiedBarrier.y1, m_copiedBarrier.y2) : m_copiedAccessPoint.y;
+    const int maxY = m_copiedBarrierElement
+                         ? std::max(m_copiedBarrier.y1, m_copiedBarrier.y2) : m_copiedAccessPoint.y;
+    const auto preferredOffset = [](int minimum, int maximum, int limit) {
+        if (maximum + 5 < limit)
+            return 5;
+        if (minimum - 5 >= 0)
+            return -5;
+        return 0;
+    };
+    const int preferredX = preferredOffset(minX, maxX, m_model.length());
+    const int preferredY = preferredOffset(minY, maxY, m_model.width());
+    if (preferredX == 0 || preferredY == 0) {
+        reportError(tr("There is not enough room to paste the element 5 cells away."));
+        return;
+    }
+
+    const QVector<QPoint> offsets = {
+        {preferredX, preferredY}, {-preferredX, preferredY},
+        {preferredX, -preferredY}, {-preferredX, -preferredY}
+    };
+    commitChange(m_copiedBarrierElement ? tr("Paste barrier") : tr("Paste access point"), [this, offsets] {
+        for (const QPoint &offset : offsets) {
+            const int x1 = m_copiedBarrierElement ? m_copiedBarrier.x1 + offset.x()
+                                                   : m_copiedAccessPoint.x + offset.x();
+            const int y1 = m_copiedBarrierElement ? m_copiedBarrier.y1 + offset.y()
+                                                   : m_copiedAccessPoint.y + offset.y();
+            const int x2 = m_copiedBarrierElement ? m_copiedBarrier.x2 + offset.x() : x1;
+            const int y2 = m_copiedBarrierElement ? m_copiedBarrier.y2 + offset.y() : y1;
+            const int candidateMinX = std::min(x1, x2);
+            const int candidateMaxX = std::max(x1, x2);
+            const int candidateMinY = std::min(y1, y2);
+            const int candidateMaxY = std::max(y1, y2);
+            if (candidateMinX < 0 || candidateMinY < 0 ||
+                candidateMaxX >= m_model.length() || candidateMaxY >= m_model.width())
+                continue;
+
+            try {
+                if (m_copiedBarrierElement) {
+                    m_selectedId = m_model.addBarrier(x1, y1, x2, y2, m_copiedBarrier.thicknessCm,
+                                                       m_copiedBarrier.material);
+                    m_selectedBarrier = true;
+                } else {
+                    m_selectedId = m_model.addAccessPoint(x1, y1, m_copiedAccessPoint.frequencyGHz,
+                                                          m_copiedAccessPoint.powerDbm);
+                    m_selectedBarrier = false;
+                }
+                return;
+            } catch (const std::invalid_argument &) {
+            }
+        }
+        throw std::invalid_argument("No valid location is available to paste the element.");
+    });
+}
+
+void MainWindow::finishDrag()
+{
+    if (!m_dragActive)
+        return;
+
+    m_dragActive = false;
+    const QJsonObject after = m_model.toJson();
+    if (after == m_dragBefore)
+        return;
+
+    m_model.loadJson(m_dragBefore);
+    m_undoStack->push(new SnapshotCommand(m_model, m_dragBefore, after,
+                                          [this] { refreshCanvas(); }, m_dragLabel));
+    statusBar()->showMessage(m_dragLabel, 3000);
 }
 
 bool MainWindow::saveMap()

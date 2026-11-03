@@ -38,12 +38,14 @@ void MapCanvas::refresh()
 
 void MapCanvas::fitToView()
 {
-    const double usableWidth = std::max(1, width() - 48);
-    const double usableHeight = std::max(1, height() - 48);
+    constexpr int leftAxisWidth = 44;
+    constexpr int bottomAxisHeight = 34;
+    const double usableWidth = std::max(1, width() - leftAxisWidth - 14);
+    const double usableHeight = std::max(1, height() - bottomAxisHeight - 14);
     m_scale = std::max(0.1, std::min(usableWidth / m_model.length(),
                                     usableHeight / m_model.width()));
-    m_offset = QPointF((width() - m_model.length() * m_scale) / 2.0,
-                       (height() - m_model.width() * m_scale) / 2.0);
+    m_offset = QPointF(leftAxisWidth + (usableWidth - m_model.length() * m_scale) / 2.0,
+                       (height() - bottomAxisHeight - m_model.width() * m_scale) / 2.0);
     update();
 }
 
@@ -87,6 +89,48 @@ QPoint MapCanvas::mapPoint(const QPointF &position, bool clamp) const
         mapY = std::clamp(mapY, 0, m_model.width() - 1);
     }
     return {mapX, mapY};
+}
+
+QPoint MapCanvas::snapPoint(QPoint point) const
+{
+    if (!m_magnetismEnabled)
+        return point;
+    const int grid = m_gridSize;
+    point.setX(std::clamp(static_cast<int>(std::round(point.x() / static_cast<double>(grid))) * grid,
+                          0, m_model.length() - 1));
+    point.setY(std::clamp(static_cast<int>(std::round(point.y() / static_cast<double>(grid))) * grid,
+                          0, m_model.width() - 1));
+    return point;
+}
+
+void MapCanvas::updateDraggedElement(QPoint point)
+{
+    if (!m_dragging)
+        return;
+
+    point = snapPoint(point);
+    const int dx = point.x() - m_dragStart.x();
+    const int dy = point.y() - m_dragStart.y();
+    if (m_selectedBarrier) {
+        const auto it = std::find_if(m_model.barriers().cbegin(), m_model.barriers().cend(),
+                                     [this](const Barrier &barrier) { return barrier.id == m_draggingId; });
+        if (it != m_model.barriers().cend()) {
+            const int x1 = m_dragOriginX1 + dx;
+            const int y1 = m_dragOriginY1 + dy;
+            const int x2 = m_dragOriginX2 + dx;
+            const int y2 = m_dragOriginY2 + dy;
+            if ((it->x1 != x1 || it->y1 != y1 || it->x2 != x2 || it->y2 != y2) && barrierMoved)
+                barrierMoved(m_draggingId, x1, y1, x2, y2);
+        }
+    } else {
+        const auto it = std::find_if(m_model.accessPoints().cbegin(), m_model.accessPoints().cend(),
+                                     [this](const AccessPoint &accessPoint) {
+                                         return accessPoint.id == m_draggingId;
+                                     });
+        if (it != m_model.accessPoints().cend() &&
+            (it->x != point.x() || it->y != point.y()) && accessPointMoved)
+            accessPointMoved(m_draggingId, point.x(), point.y());
+    }
 }
 
 void MapCanvas::drawScene(QPainter &painter, double cellSize, bool includeGrid) const
@@ -164,6 +208,53 @@ void MapCanvas::drawScene(QPainter &painter, double cellSize, bool includeGrid) 
     }
 }
 
+void MapCanvas::drawAxes(QPainter &painter) const
+{
+    const double mapWidth = m_model.length() * m_scale;
+    const double mapHeight = m_model.width() * m_scale;
+    const double left = m_offset.x();
+    const double right = left + mapWidth;
+    const double top = m_offset.y();
+    const double bottom = top + mapHeight;
+    const int horizontalStep = m_gridSize *
+        std::max(1, static_cast<int>(std::ceil(56.0 / (m_scale * m_gridSize))));
+    const int verticalStep = horizontalStep;
+
+    painter.save();
+    painter.setPen(QPen(QColor(70, 70, 70), 1));
+    painter.drawLine(QPointF(left, bottom), QPointF(right, bottom));
+    painter.drawLine(QPointF(left, top), QPointF(left, bottom));
+
+    const QFontMetrics metrics(painter.font());
+    const int labelHeight = metrics.height();
+    for (int x = 0; x < m_model.length(); x += horizontalStep) {
+        const double px = left + (x + 0.5) * m_scale;
+        painter.drawLine(QPointF(px, bottom), QPointF(px, bottom + 4));
+        const QString label = QString::number(x);
+        const int labelWidth = metrics.horizontalAdvance(label);
+        painter.drawText(QRectF(px - labelWidth / 2.0, bottom + 5,
+                                labelWidth, labelHeight),
+                         Qt::AlignHCenter | Qt::AlignTop, label);
+    }
+
+    for (int y = 0; y < m_model.width(); y += verticalStep) {
+        const double py = bottom - (y + 0.5) * m_scale;
+        painter.drawLine(QPointF(left - 4, py), QPointF(left, py));
+        painter.drawText(QRectF(0, py - labelHeight / 2.0, left - 7, labelHeight),
+                         Qt::AlignRight | Qt::AlignVCenter, QString::number(y));
+    }
+
+    painter.drawText(QRectF(right - 18, bottom + 18, 18, labelHeight),
+                     Qt::AlignRight | Qt::AlignTop, tr("X"));
+    painter.save();
+    painter.translate(12, top + mapHeight / 2.0);
+    painter.rotate(-90);
+    painter.drawText(QRectF(-mapHeight / 2.0, -labelHeight / 2.0, mapHeight, labelHeight),
+                     Qt::AlignHCenter | Qt::AlignVCenter, tr("Y"));
+    painter.restore();
+    painter.restore();
+}
+
 void MapCanvas::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
@@ -171,6 +262,7 @@ void MapCanvas::paintEvent(QPaintEvent *)
     painter.save();
     drawScene(painter, m_scale, m_gridVisible);
     painter.restore();
+    drawAxes(painter);
 
     const QRect legendRect(width() - 230, height() - 54, 214, 40);
     painter.setPen(QPen(QColor(70, 70, 70), 1));
@@ -196,6 +288,7 @@ void MapCanvas::paintEvent(QPaintEvent *)
 void MapCanvas::mousePressEvent(QMouseEvent *event)
 {
     m_lastMouse = event->pos();
+    setFocus();
     if (event->button() == Qt::MiddleButton || event->button() == Qt::RightButton) {
         m_panning = true;
         setCursor(Qt::ClosedHandCursor);
@@ -229,12 +322,28 @@ void MapCanvas::mousePressEvent(QMouseEvent *event)
         m_draggingId = pointId;
         m_dragging = true;
         m_dragStart = point;
+        const auto it = std::find_if(m_model.accessPoints().cbegin(), m_model.accessPoints().cend(),
+                                     [pointId](const AccessPoint &accessPoint) {
+                                         return accessPoint.id == pointId;
+                                     });
+        if (it != m_model.accessPoints().cend()) {
+            m_dragOriginX1 = it->x;
+            m_dragOriginY1 = it->y;
+        }
     } else if (barrierId >= 0) {
         m_selectedId = barrierId;
         m_selectedBarrier = true;
         m_draggingId = barrierId;
         m_dragging = true;
         m_dragStart = point;
+        const auto it = std::find_if(m_model.barriers().cbegin(), m_model.barriers().cend(),
+                                     [barrierId](const Barrier &barrier) { return barrier.id == barrierId; });
+        if (it != m_model.barriers().cend()) {
+            m_dragOriginX1 = it->x1;
+            m_dragOriginY1 = it->y1;
+            m_dragOriginX2 = it->x2;
+            m_dragOriginY2 = it->y2;
+        }
     } else {
         m_selectedId = -1;
         m_draggingId = -1;
@@ -242,6 +351,8 @@ void MapCanvas::mousePressEvent(QMouseEvent *event)
     }
     if (selectionChanged)
         selectionChanged(m_selectedId);
+    if (m_dragging && dragStarted)
+        dragStarted(m_draggingId, m_selectedBarrier);
     update();
 }
 
@@ -263,6 +374,7 @@ void MapCanvas::mouseMoveEvent(QMouseEvent *event)
     }
 
     if (m_dragging && (event->buttons() & Qt::LeftButton)) {
+        updateDraggedElement(mapPoint(event->position(), true));
         return;
     }
 
@@ -342,28 +454,13 @@ void MapCanvas::mouseReleaseEvent(QMouseEvent *event)
         return;
     }
     if (m_dragging) {
-        QPoint end = mapPoint(event->position(), true);
-        if (m_magnetismEnabled) {
-            const int grid = m_gridSize;
-            end.setX(std::clamp(static_cast<int>(std::round(end.x() / static_cast<double>(grid))) * grid,
-                                0, m_model.length() - 1));
-            end.setY(std::clamp(static_cast<int>(std::round(end.y() / static_cast<double>(grid))) * grid,
-                                0, m_model.width() - 1));
-        }
-        const int dx = end.x() - m_dragStart.x();
-        const int dy = end.y() - m_dragStart.y();
-        if (m_selectedBarrier) {
-            const auto it = std::find_if(m_model.barriers().cbegin(), m_model.barriers().cend(),
-                                         [this](const Barrier &b) { return b.id == m_draggingId; });
-            if (it != m_model.barriers().cend() && barrierMoved)
-                barrierMoved(m_draggingId, it->x1 + dx, it->y1 + dy,
-                             it->x2 + dx, it->y2 + dy);
-        } else if (accessPointMoved) {
-            accessPointMoved(m_draggingId, end.x(), end.y());
-        }
+        updateDraggedElement(mapPoint(event->position(), true));
     }
+    const bool finishedDrag = m_dragging;
     m_dragging = false;
     m_draggingId = -1;
+    if (finishedDrag && dragFinished)
+        dragFinished();
 }
 
 void MapCanvas::wheelEvent(QWheelEvent *event)

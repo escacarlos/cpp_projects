@@ -26,6 +26,8 @@ public:
     std::function<void(int, int, int, int)> barrierDrawn;
     std::function<void(int, int, int)> accessPointMoved;
     std::function<void(int, int, int, int, int)> barrierMoved;
+    std::function<void(int, bool)> dragStarted;
+    std::function<void()> dragFinished;
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -44,6 +46,10 @@ private:
     QPoint m_drawStart;
     QPoint m_drawCurrent;
     QPoint m_dragStart;
+    int m_dragOriginX1 = 0;
+    int m_dragOriginY1 = 0;
+    int m_dragOriginX2 = 0;
+    int m_dragOriginY2 = 0;
     int m_selectedId = -1;
     int m_draggingId = -1;
     bool m_selectedBarrier = false;
@@ -56,5 +62,8 @@ private:
     int m_gridSize = 10;
 
     QPoint mapPoint(const QPointF &position, bool clamp) const;
+    QPoint snapPoint(QPoint point) const;
+    void updateDraggedElement(QPoint point);
     void drawScene(QPainter &painter, double cellSize, bool includeGrid) const;
+    void drawAxes(QPainter &painter) const;
 };
