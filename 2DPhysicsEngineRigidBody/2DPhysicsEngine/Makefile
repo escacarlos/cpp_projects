@@ -8,8 +8,16 @@ SRC_FILES = ./lib/SDL2_gfx/*.c \
 			./src/*.cpp \
 			./src/Physics/*.cpp \
 
-LINKER_FLAGS = -lSDL2main -lSDL2 -lSDL2_image #-lmingw32 
+LINKER_FLAGS = -lmingw32 -lSDL2main -lSDL2 -lSDL2_image
+ifeq ($(OS),Windows_NT)
+OBJ_NAME = physicengine.exe
+RUN_COMMAND = $(OBJ_NAME)
+CLEAN_COMMAND = cmd /C del /Q $(OBJ_NAME)
+else
 OBJ_NAME = physicengine
+RUN_COMMAND = ./$(OBJ_NAME)
+CLEAN_COMMAND = rm -f $(OBJ_NAME)
+endif
 
 ################################################################################
 # Declare some Makefile rules
@@ -18,7 +26,7 @@ build:
 	$(CC) $(COMPILER_FLAGS) $(LANG_STD) $(INCLUDE_PATH) $(SRC_FILES) $(LINKER_FLAGS) -o $(OBJ_NAME)
 
 run:
-	./$(OBJ_NAME)
+	$(RUN_COMMAND)
 
 clean:
-	rm $(OBJ_NAME)
+	$(CLEAN_COMMAND)
